@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-from utils.datasets import LoadImages
+from dataset.yolo.datasets import LoadImages
 from utils.general import (check_img_size, increment_path, non_max_suppression, scale_coords)
 from utils.plots import Annotator, colors, save_one_box
 
