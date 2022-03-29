@@ -1,11 +1,9 @@
 import torch
 from torch.utils.data import Dataset
 from .transforms import DEFAULT_TRANSFORMS
-import cv2
 import glob
 import os
 import re
-import numpy as np
 from PIL import Image
 
 STRIDE = 1
