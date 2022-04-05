@@ -1,7 +1,17 @@
+from pathlib import Path
+import sys
+import os
+from utils.general import increment_path
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[2]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
 import torch
 from torch.utils.data import DataLoader
 from torch import nn
-from torch.autograd import Variable
 from tqdm import tqdm
 from eval.cnn3d import Evaluator
 from metrics import acc_score_tensor
@@ -24,7 +34,12 @@ class Trainer:
                  interval=1,
                  patience=20,
                  # include_weight=True,
-                 path="output/checkpoints/checkpoint.pt"):
+                 project=ROOT / 'runs/cnn3d',  # save results to project/name
+                 name='exp'):
+
+        save_dir = increment_path(Path(project) / name, exist_ok=False)  # increment run
+        save_dir.mkdir(parents=True, exist_ok=True)
+        path = f"{str(save_dir)}/best.pt"
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
         self.val_loader = DataLoader(val_data, batch_size=batch_size)
@@ -54,8 +69,8 @@ class Trainer:
             length = 0
             for i, (x, y) in enumerate(tqdm(self.train_loader), 0):
                 self.model.train()
-                b_x = Variable(x).to(self.device)
-                b_y = Variable(y).to(self.device)
+                b_x = x.to(self.device)
+                b_y = y.to(self.device)
                 output = self.model(b_x)
                 loss = self.criterion(output, b_y)
                 epoch_loss += loss.item()*b_y.shape[0]
@@ -74,6 +89,6 @@ class Trainer:
                     eval_loss, eval_acc = results["loss"], results["acc"]
                     print(f"train loss: {epoch_loss / length}, train accuracy: {epoch_acc / length}; "
                           f"eval loss: {eval_loss}, eval accuracy: {eval_acc}")
-                    self.early_stopping(loss, self.model)
+                    self.early_stopping(eval_loss, self.model)
             if self.early_stopping.early_stop:
                 break
