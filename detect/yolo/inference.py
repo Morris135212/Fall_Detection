@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import IPython
 import cv2
+import numpy as np
 import torch
 from IPython.core.display import display
 from PIL import Image
@@ -269,4 +270,146 @@ def run(model,  # model.pt path(s)
                     # display(frame)
                     show_array(frame_array)
                     # IPython.display.clear_output(wait=True)  # clear the previous frame
+    return im0
+
+
+@torch.no_grad()
+def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
+                           source=0,  # file/dir/URL/glob, 0 for webcam
+                           data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
+                           out_name="tmp",
+                           imgsz=(416, 416),  # inference size (height, width)
+                           detect_interval=1,
+                           detect=True,
+                           project=ROOT / 'runs/detect',  # save results to project/name
+                           name='exp',  # save results to project/name
+                           exist_ok=True,  # existing project/name ok, do not increment
+                           half=False,  # use FP16 half-precision inference
+                           **kwargs
+                           ):
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model = DetectMultiBackend(weights, device=device, data=data)
+    # Load model
+    stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
+    model.warmup(imgsz=(1, 3, *imgsz), half=half)  # warmup
+    imgsz = check_img_size(imgsz, s=stride)  # check image size
+
+    if source:
+        v_cap = cv2.VideoCapture(source)  # initialize the video capture
+    else:
+        v_cap = cv2.VideoCapture(0)
+
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # define encoding type
+    size = (int(v_cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            int(v_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    fps = 20.0
+    video_out_path = str(save_dir / f"{out_name}.mp4")
+    out = cv2.VideoWriter(video_out_path, fourcc, fps, size)  # initialize video writer
+
+    frame_count = 0  # initialize frame count
+    try:
+        while True:
+            frame_count += 1
+            success, frame = v_cap.read()  # read frame from video
+            if not success:
+                print("Detect Finished")
+                break
+            if frame_count % detect_interval == 0:
+
+                if detect:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame = cv2.resize(frame, imgsz)
+                    frame = run_per_img(model,
+                                        frame,
+                                        device=device,
+                                        project=project,
+                                        name=name,
+                                        exist_ok=exist_ok,
+                                        half=half,
+                                        **kwargs
+                                        )
+                    out.write(frame)
+        v_cap.release()
+        out.release()
+    except KeyboardInterrupt:
+        v_cap.release()
+        out.release()
+        print("Detect Finish")
+
+
+@torch.no_grad()
+def run_per_img(model,  # model.pt path(s)
+                img,
+                device=torch.device("cpu"),
+                conf_thres=0.25,  # confidence threshold
+                iou_thres=0.45,  # NMS IOU threshold
+                max_det=1000,  # maximum detections per image
+                view_img=False,  # show results
+                save_txt=False,  # save results to *.txt
+                save_img=True,  # save confidences in --save-txt labels
+                save_crop=False,  # save cropped prediction boxes
+                classes=None,  # filter by class: --class 0, or --class 0 2 3
+                agnostic_nms=False,  # class-agnostic NMS
+                augment=False,  # augmented inference
+                visualize=False,  # visualize features
+                project=ROOT / 'runs/detect',  # save results to project/name
+                name='exp',  # save results to project/name
+                exist_ok=True,  # existing project/name ok, do not increment
+                line_thickness=3,  # bounding box thickness (pixels)
+                hide_labels=False,  # hide labels
+                hide_conf=False,  # hide confidences
+                half=False,  # use FP16 half-precision inference
+                ):
+    # Directories
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+
+    # Load model
+    stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
+
+    # Half
+    half &= (pt or jit or onnx or engine) and device.type != 'cpu'  # FP16 supported on limited backends with CUDA
+
+    # dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
+
+    if type(img) == np.ndarray and len(img.shape) == 3:  # cv2 image
+        im = torch.from_numpy(img.transpose(2, 0, 1)).float().div(255.0).unsqueeze(0).to(device)
+    else:
+        print("unknow image type")
+        exit(-1)
+
+    # Inference
+    pred = model(im, augment=augment, visualize=visualize)
+
+    # NMS
+    pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+    # Process predictions
+    for i, det in enumerate(pred):  # per image
+        im0 = img.copy()
+        imc = im0.copy() if save_crop else im0  # for save_crop
+        annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+        if len(det):
+            # Rescale boxes from img_size to im0 size
+            det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+            # Write results
+            for *xyxy, conf, cls in reversed(det):
+                if save_crop or view_img:  # Add bbox to image
+                    c = int(cls)  # integer class
+                    label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                    annotator.box_label(xyxy, label, color=colors(c, True))
+                    if save_crop:
+                        save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'detected.jpg', BGR=True)
+
+        # Stream results
+        im0 = annotator.result()
+        if view_img or save_img:
+            if save_img:
+                save_path = save_dir / "detected.png"
+                frame = Image.fromarray(im0)
+                frame.save(save_path)
+            if view_img:
+                IPython.display.clear_output(wait=True)  # clear the previous frame
+                show_array(im0)
+
     return im0
