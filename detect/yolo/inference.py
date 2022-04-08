@@ -9,6 +9,7 @@ from PIL import Image
 import torchvision.transforms as T
 
 from models.common import DetectMultiBackend
+from utils.inference_utils import show_array
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]  # YOLOv5 root directory
@@ -259,11 +260,13 @@ def run(model,  # model.pt path(s)
             im0 = annotator.result()
             if view_img or save_img:
                 frame_array = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
-                frame = Image.fromarray(frame_array)
                 if save_img:
                     save_path = save_dir / source.split("/")[-1]
+                    frame = Image.fromarray(frame_array)
                     frame.save(save_path)
                 if view_img:
                     IPython.display.clear_output(wait=True)  # clear the previous frame
-                    display(frame)
+                    # display(frame)
+                    show_array(frame_array)
+                    # IPython.display.clear_output(wait=True)  # clear the previous frame
     return im0
