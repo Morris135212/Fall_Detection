@@ -292,7 +292,7 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     # Load model
     stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
     model.warmup(imgsz=(1, 3, *imgsz), half=half)  # warmup
-    imgsz = check_img_size(imgsz, s=stride)  # check image size
+    imgsz = tuple(check_img_size(imgsz, s=stride))  # check image size
 
     if source:
         v_cap = cv2.VideoCapture(source)  # initialize the video capture
