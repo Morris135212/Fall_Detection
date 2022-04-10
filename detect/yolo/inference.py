@@ -318,7 +318,6 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             if frame_count % detect_interval == 0:
 
                 if detect:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     frame = cv2.resize(frame, imgsz)
                     frame = run_per_img(model,
                                         frame,
@@ -329,7 +328,9 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                                         half=half,
                                         **kwargs
                                         )
-                    out.write(frame)
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.resize(frame, size)
+            out.write(frame)
         v_cap.release()
         out.release()
     except KeyboardInterrupt:
@@ -403,6 +404,7 @@ def run_per_img(model,  # model.pt path(s)
 
         # Stream results
         im0 = annotator.result()
+        im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
         if view_img or save_img:
             if save_img:
                 save_path = save_dir / "detected.png"
