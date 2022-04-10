@@ -20,7 +20,10 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from utils.general import (increment_path, non_max_suppression, scale_coords, check_img_size)
 from utils.plots import Annotator, colors, save_one_box
+from deep_sort import DeepSort
 
+deepsort = DeepSort("deep_sort/deep/checkpoint/ckpt.t7")
+palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 HISTORY = []
 
 

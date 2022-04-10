@@ -19,9 +19,13 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from dataset.yolo.datasets import LoadImages
-from utils.general import (check_img_size, increment_path, non_max_suppression, scale_coords)
-from utils.plots import Annotator, colors, save_one_box
+from utils.general import (check_img_size, increment_path, non_max_suppression, scale_coords, bbox_rel)
+from utils.plots import Annotator, colors, save_one_box, compute_color_for_labels, draw_boxes
+from deep_sort import DeepSort
 
+deepsort = DeepSort("deep_sort/deep/checkpoint/ckpt.t7")
+palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
+HISTORY = []
 DATA_SHAPE = (416, 416)
 DEFAULT_TRANSFORMS = T.Compose([
     T.Resize(DATA_SHAPE),
@@ -283,6 +287,7 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                            detect=True,
                            project=ROOT / 'runs/detect',  # save results to project/name
                            name='exp',  # save results to project/name
+                           tracking=False,
                            exist_ok=True,  # existing project/name ok, do not increment
                            half=False,  # use FP16 half-precision inference
                            **kwargs
@@ -319,15 +324,26 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
                 if detect:
                     frame = cv2.resize(frame, imgsz)
-                    frame = run_per_img(model,
-                                        frame,
-                                        device=device,
-                                        project=project,
-                                        name=name,
-                                        exist_ok=exist_ok,
-                                        half=half,
-                                        **kwargs
-                                        )
+                    if tracking:
+                        frame = run_per_img(model,
+                                            frame,
+                                            device=device,
+                                            project=project,
+                                            name=name,
+                                            exist_ok=exist_ok,
+                                            half=half,
+                                            **kwargs
+                                            )
+                    else:
+                        frame = run_per_img_tracking(model,
+                                                     frame,
+                                                     device=device,
+                                                     project=project,
+                                                     name=name,
+                                                     exist_ok=exist_ok,
+                                                     half=half,
+                                                     **kwargs
+                                                     )
             # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.resize(frame, size)
             out.write(frame)
@@ -404,6 +420,89 @@ def run_per_img(model,  # model.pt path(s)
 
         # Stream results
         im0 = annotator.result()
+        im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
+        if view_img or save_img:
+            if save_img:
+                save_path = save_dir / "detected.png"
+                frame = Image.fromarray(im0)
+                frame.save(save_path)
+            if view_img:
+                IPython.display.clear_output(wait=True)  # clear the previous frame
+                show_array(im0)
+
+    return im0
+
+
+@torch.no_grad()
+def run_per_img_tracking(model,  # model.pt path(s)
+                         img,
+                         device=torch.device("cpu"),
+                         conf_thres=0.25,  # confidence threshold
+                         iou_thres=0.45,  # NMS IOU threshold
+                         max_det=1000,  # maximum detections per image
+                         view_img=False,  # show results
+                         save_txt=False,  # save results to *.txt
+                         save_img=True,  # save confidences in --save-txt labels
+                         save_crop=False,  # save cropped prediction boxes
+                         classes=None,  # filter by class: --class 0, or --class 0 2 3
+                         agnostic_nms=False,  # class-agnostic NMS
+                         augment=False,  # augmented inference
+                         visualize=False,  # visualize features
+                         project=ROOT / 'runs/detect',  # save results to project/name
+                         name='exp',  # save results to project/name
+                         exist_ok=True,  # existing project/name ok, do not increment
+                         line_thickness=3,  # bounding box thickness (pixels)
+                         hide_labels=False,  # hide labels
+                         hide_conf=False,  # hide confidences
+                         half=False,  # use FP16 half-precision inference
+                         ):
+    # Directories
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+
+    # Load model
+    stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
+
+    # Half
+    half &= (pt or jit or onnx or engine) and device.type != 'cpu'  # FP16 supported on limited backends with CUDA
+
+    # dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
+
+    if type(img) == np.ndarray and len(img.shape) == 3:  # cv2 image
+        im = torch.from_numpy(img.transpose(2, 0, 1)).float().div(255.0).unsqueeze(0).to(device)
+    else:
+        print("unknow image type")
+        exit(-1)
+
+    # Inference
+    pred = model(im, augment=augment, visualize=visualize)
+
+    # NMS
+    pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+    # Process predictions
+    for i, det in enumerate(pred):  # per image
+        im0 = img.copy()
+        imc = im0.copy() if save_crop else im0  # for save_crop
+        if len(det):
+            # Rescale boxes from img_size to im0 size
+            det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+            bbox_xywh = []
+            confs = []
+
+            # Write results
+            for *xyxy, conf, cls in reversed(det):
+                x_c, y_c, bbox_w, bbox_h = bbox_rel(xyxy)
+                obj = [x_c, y_c, bbox_w, bbox_h]
+                bbox_xywh.append(obj)
+                confs.append([conf.item()])
+
+            outputs = deepsort.update((torch.Tensor(bbox_xywh)), (torch.Tensor(confs)), im0)
+            if len(outputs) > 0:
+                bbox_xyxy = outputs[:, :4]
+                identities = outputs[:, -1]
+                draw_boxes(im0, bbox_xyxy, identities)
+
+        # Stream results
         im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
         if view_img or save_img:
             if save_img:
