@@ -24,7 +24,56 @@ pip install -r requirements.txt  # install
 </details>
 
 <details open>
-<summary>Inference</summary>
+<summary>Training</summary>
+
+**yolo training**
+
+Same process as referred to [yolov5](https://github.com/Morris135212/yolov5)
+
+```
+python train.py --data custom.yaml --cfg yolov5n.yaml --weights '' --batch-size 128
+                                         yolov5s                                 64
+                                         yolov5m                                 40
+                                         yolov5l                                 24
+                                         yolov5x                          
+```
+
+**3dcnn training**
+
+```python
+from dataset.cnn3d import CustomDataset
+# Load train & validation data
+train_path = "./data/dataset/Fall_Detection/Train"
+val_path = "./data/dataset/Fall_Detection/Test"
+classes = ["Walk", "Fall"]
+trainset = CustomDataset(train_path, classes)
+valset = CustomDataset(val_path, classes)
+
+# Get model
+from models.cnn3d import get_model, resnet10
+model = get_model(sample_size=112, sample_duration=10, num_classes=2)
+# resnet = resnet10(sample_size=112, sample_duration=10, num_classes=2)
+
+# Training
+from train.cnn3d import Trainer
+config = {
+    "model": model,
+    "train_data":trainset,
+    "val_data":valset,
+    "batch_size":2,
+    "epochs":20,
+    "step_size":200,
+    "lr":1e-3,
+    "interval":40
+}
+trainer = Trainer(**config)
+trainer()
+```
+
+</details>
+
+<details open>
+<summary>Fall Detection Inference</summary>
 
 ```python
 from models.common import DetectMultiBackend
