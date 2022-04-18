@@ -5,7 +5,6 @@ import IPython
 import cv2
 import numpy as np
 import torch
-from IPython.core.display import display
 from PIL import Image
 from collections import deque
 
@@ -25,6 +24,7 @@ from deep_sort import DeepSort
 deepsort = DeepSort("deep_sort/deep/checkpoint/ckpt.t7")
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 HISTORY = []
+FLAG = False
 
 
 @torch.no_grad()
@@ -66,6 +66,8 @@ def live_inference(yolo_model,
 
     frame_count = 0  # initialize frame count
     box_que = deque(maxlen=10)
+    color = (255, 255, 0)
+    texts = "FALL ACTION INACTIVATED"
     try:
         while True:
             frame_count += 1
@@ -73,8 +75,6 @@ def live_inference(yolo_model,
             if not success:
                 print("Detect Finished")
                 break
-            color = (255, 255, 0)
-            texts = "FALL ACTION INACTIVATED"
             if frame_count % detect_interval == 0:
 
                 if detect:
@@ -97,15 +97,18 @@ def live_inference(yolo_model,
                             if len(box_que) == 10:
                                 flag = run_cnn3d(box_que, cnn3d, device, class_names, duration=duration)
                                 if flag:
-                                    texts = "FALL!!!"
+                                    texts = f"FALL!!!"
                                     color = (255, 0, 0)
                                 else:
-                                    texts = "WALK"
+                                    texts = f"WALK"
                                     color = (0, 255, 0)
                             else:
-                                texts = "PENDING"
+                                texts = f"PENDING"
+                                color = (255, 255, 0)
                         else:
-                            texts = "NO PEOPLE DETECTED"
+                            if not FLAG:
+                                texts = f"NO PEOPLE DETECTED"
+                                color = (255, 255, 0)
             cv2.putText(frame, texts, (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75,
                         color, 2)
             IPython.display.clear_output(wait=True)  # clear the previous frame
@@ -125,6 +128,7 @@ def live_inference(yolo_model,
 
 @torch.no_grad()
 def run_cnn3d(frames, model, device, class_names, duration=1, target="FALL"):
+    global FLAG
     imgs = torch.stack(list(frames), dim=1).unsqueeze(0).to(device)
     out = model(imgs)
     pred_fall_idx = torch.argmax(out, dim=1)[0]
@@ -134,6 +138,7 @@ def run_cnn3d(frames, model, device, class_names, duration=1, target="FALL"):
     if len(HISTORY) >= duration:
         tmp_fall_history = HISTORY[-duration:]
         flag = all(t == target for t in tmp_fall_history)
+    FLAG = flag
     return flag
 
 
