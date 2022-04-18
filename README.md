@@ -1,7 +1,6 @@
 # Fall Detection
 <p> In real world, people, especially elder people, are urgent to search for device that can inspect their personal health, given the fact that those people are extremely vulnerable.
 Nowadays, people are easily to obtain their physical characteristics by smart device like iWatch.
-
 However, those devices are generally unable to detect some motion characteristics like Falling. Falling is extremely dangerous when someone live alone. So this brought me the inspiration to construct this framework to detect Fall action in home.
 </p>
 
@@ -30,6 +29,7 @@ pip install -r requirements.txt  # install
 
 Same process as referred to [yolov5](https://github.com/Morris135212/yolov5)
 
+Here we apply pedestrian dataset found online as training set.
 ```
 python train.py --data custom.yaml --cfg yolov5n.yaml --weights '' --batch-size 128
                                          yolov5s                                 64
@@ -40,6 +40,39 @@ python train.py --data custom.yaml --cfg yolov5n.yaml --weights '' --batch-size 
 
 **3dcnn training**
 
+under the dataset there should be two folders: Train and Test, and it should be like the following
+
+```
+- Train
+    - Category 1
+        - folder_name_1
+            - **1.png
+            - **2.png
+            - **3.png
+            - ...
+        - folder_name_2
+        - ...
+    - Category 2
+    - ...
+Test
+    - ..
+```
+In this framework the layout of the folders is like this:
+
+```
+- Train
+    - Walk
+        - 1
+            - 1.png
+            - 2.png
+            - ...
+        - 2
+        - ...
+    - Fall
+Test
+    - ..
+```
+The script below shows how to train a 3dcnn model.
 ```python
 from dataset.cnn3d import CustomDataset
 # Load train & validation data
@@ -56,6 +89,8 @@ model = get_model(sample_size=112, sample_duration=10, num_classes=2)
 
 # Training
 from train.cnn3d import Trainer
+
+# Configs
 config = {
     "model": model,
     "train_data":trainset,
@@ -74,6 +109,8 @@ trainer()
 
 <details open>
 <summary>Fall Detection Inference</summary>
+
+The script below shows how to do Fall detection inference
 
 ```python
 from models.common import DetectMultiBackend
