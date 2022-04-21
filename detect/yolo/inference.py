@@ -315,7 +315,7 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     frame_count = 0  # initialize frame count
     try:
         while True:
-            frame_count += 1
+            kwargs["frame_id"] = frame_count
             success, frame = v_cap.read()  # read frame from video
             if not success:
                 print("Detect Finished")
@@ -324,7 +324,7 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
                 if detect:
                     frame = cv2.resize(frame, imgsz)
-                    if tracking:
+                    if not tracking:
                         frame = run_per_img(model,
                                             frame,
                                             device=device,
@@ -347,6 +347,7 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.resize(frame, size)
             out.write(frame)
+            frame_count += 1
         v_cap.release()
         out.release()
     except KeyboardInterrupt:
@@ -377,6 +378,7 @@ def run_per_img(model,  # model.pt path(s)
                 hide_labels=False,  # hide labels
                 hide_conf=False,  # hide confidences
                 half=False,  # use FP16 half-precision inference
+                **kwargs
                 ):
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
@@ -409,15 +411,27 @@ def run_per_img(model,  # model.pt path(s)
         if len(det):
             # Rescale boxes from img_size to im0 size
             det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+            labels = ""
             # Write results
             for *xyxy, conf, cls in reversed(det):
+                if save_txt:
+                    [x1, y1, x2, y2] = xyxy
+                    if "frame_id" in kwargs:
+                        frame_id = kwargs["frame_id"]
+                        labels += f"{frame_id} {int(cls)} {conf:.2f} {x1.int().item()} {y1.int().item()} {x2.int().item()} {y2.int().item()} "
+                    else:
+                        labels += f"{int(cls)} {conf:.2f} {x1.int().item()} {y1.int().item()} {x2.int().item()} {y2.int().item()} "
                 if save_crop or view_img:  # Add bbox to image
                     c = int(cls)  # integer class
                     label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
                     annotator.box_label(xyxy, label, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'detected.jpg', BGR=True)
-
+            labels += "\n"
+            if save_txt:
+                with open(save_dir / "labels" / "labels.txt", "a+") as f:
+                    f.write(labels)
+                f.close()
         # Stream results
         im0 = annotator.result()
         im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
