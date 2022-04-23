@@ -1,22 +1,43 @@
 from collections import namedtuple
+import torch
+from dataset.cnn3d import DEFAULT_TRANSFORMS
 from utils.metrics import bbox_iou
+from utils.plots import save_one_box
+from collections import deque
+from PIL import Image
+
 
 Detection = namedtuple("Detection", ["bbox", "conf"])
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
 class Track:
-    def __init__(self, idx, bbox, conf):
+    def __init__(self, idx, bbox, conf, img):
         self.idx = idx
-        self.bbox = bbox
-        self.conf = conf
         self.age = 0
-        self.box_history = [bbox]
+        self.box_history = deque(maxlen=10)
+        self.__update__(bbox, conf, img)
         self.current = False
+        self.fall_history = []
 
-    def __update__(self, bbox, conf):
+    def __update__(self, bbox, conf, img):
         self.bbox = bbox
         self.conf = conf
-        self.box_history.append(bbox)
+        crops = save_one_box(bbox, img, save=False, BGR=False)
+        self.box_history.append(DEFAULT_TRANSFORMS(Image.fromarray(crops)))
+
+    def __inference__(self, model, duration=2, target_idx=1):
+        if len(self.box_history) < 10:
+            return False
+        imgs = torch.stack(list(self.box_history), dim=1).unsqueeze(0).to(device)
+        out = model(imgs)
+        pred_fall_idx = torch.argmax(out, dim=1)[0]
+        self.fall_history.append(pred_fall_idx.item())
+        flag = False
+        if len(self.fall_history) >= duration:
+            tmp_fall_history = self.fall_history[-duration:]
+            flag = all(t == target_idx for t in tmp_fall_history)
+        return flag
 
     def __str__(self):
         return f"{self.idx} {self.bbox}"
@@ -31,7 +52,7 @@ class Tracks:
         self.tracks = []
         self.detections = []
 
-    def update(self, bboxes_xywh, confidences):
+    def update(self, bboxes_xywh, confidences, img):
         """
         The input bounding boxes must be in the form [xmin, ymin, xmax, ymax]
         """
@@ -47,7 +68,7 @@ class Tracks:
 
         if not self.tracks:
             for i, (box, conf) in enumerate(zip(bboxes_xywh, confidences)):
-                self.tracks.append(Track(i, box, conf))
+                self.tracks.append(Track(i, box, conf, img))
                 self.latest_id = i
         else:
             self.detections = []
@@ -63,7 +84,7 @@ class Tracks:
                     track.age += 1
                     track.current = False
                 else:
-                    track.__update__(self.detections[matches[i]].bbox, self.detections[matches[i]].conf)
+                    track.__update__(self.detections[matches[i]].bbox, self.detections[matches[i]].conf, img)
                     track.current = True
 
             # Delete all tracks with age greater than desired age
@@ -75,5 +96,5 @@ class Tracks:
             matches = set(matches)
             for i, detection in enumerate(self.detections):
                 if i not in matches and detection.conf > self.min_conf:
-                    self.tracks.append(Track(self.latest_id + 1, detection.bbox, detection.conf))
+                    self.tracks.append(Track(self.latest_id + 1, detection.bbox, detection.conf, img))
                     self.latest_id += 1
