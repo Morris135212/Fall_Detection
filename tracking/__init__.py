@@ -1,8 +1,10 @@
 from collections import namedtuple
+
+import cv2
 import torch
 from dataset.cnn3d import DEFAULT_TRANSFORMS
 from utils.metrics import bbox_iou
-from utils.plots import save_one_box
+from utils.plots import save_one_box, compute_color_for_labels
 from collections import deque
 from PIL import Image
 
@@ -25,6 +27,21 @@ class Track:
         self.conf = conf
         crops = save_one_box(bbox, img, save=False, BGR=False)
         self.box_history.append(DEFAULT_TRANSFORMS(Image.fromarray(crops)))
+
+    def __draw__(self, img, offset=(0, 0), color=None):
+        x1, y1, x2, y2 = [int(i) for i in self.bbox]
+        x1 += offset[0]
+        x2 += offset[0]
+        y1 += offset[1]
+        y2 += offset[1]
+        if not color:
+            color = compute_color_for_labels(self.idx)
+        label = '{}{:d}'.format("", self.idx)
+        t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 2, 2)[0]
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, 3)
+        cv2.rectangle(img, (x1, y1), (x1 + t_size[0] + 3, y1 + t_size[1] + 4), color, -1)
+        cv2.putText(img, label, (x1, y1 + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 2, [255, 255, 255], 2)
+        return img
 
     def __inference__(self, model, duration=2, target_idx=1):
         if len(self.box_history) < 10:
@@ -69,7 +86,7 @@ class Tracks:
         if not self.tracks:
             for i, (box, conf) in enumerate(zip(bboxes_xywh, confidences)):
                 self.tracks.append(Track(i, box, conf, img))
-                self.latest_id = i
+                self.latest_id += i
         else:
             self.detections = []
             for i, (box, conf) in enumerate(zip(bboxes_xywh, confidences)):
@@ -86,6 +103,7 @@ class Tracks:
                 else:
                     track.__update__(self.detections[matches[i]].bbox, self.detections[matches[i]].conf, img)
                     track.current = True
+                    track.age = 0
 
             # Delete all tracks with age greater than desired age
             for i, track in enumerate(self.tracks):

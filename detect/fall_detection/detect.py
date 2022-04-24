@@ -5,10 +5,6 @@ import IPython
 import cv2
 import numpy as np
 import torch
-from PIL import Image
-from collections import deque
-
-from dataset.cnn3d import DEFAULT_TRANSFORMS
 from utils.inference_utils import show_array
 
 FILE = Path(__file__).resolve()
@@ -18,10 +14,9 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from utils.general import (increment_path, non_max_suppression, scale_coords, check_img_size)
-from utils.plots import Annotator, colors, save_one_box
-from deep_sort import DeepSort
+from tracking import Tracks
 
-deepsort = DeepSort("deep_sort/deep/checkpoint/ckpt.t7")
+tracks = Tracks(min_conf=0.5)
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 HISTORY = []
 FLAG = False
@@ -30,7 +25,6 @@ FLAG = False
 @torch.no_grad()
 def live_inference(yolo_model,
                    cnn3d,
-                   class_names,
                    duration=2,
                    source=0,  # file/dir/URL/glob, 0 for webcam
                    out_name="tmp",
@@ -65,9 +59,8 @@ def live_inference(yolo_model,
     out = cv2.VideoWriter(video_out_path, fourcc, fps, size)  # initialize video writer
 
     frame_count = 0  # initialize frame count
-    box_que = deque(maxlen=10)
-    color = (255, 255, 0)
-    texts = "FALL ACTION INACTIVATED"
+    color = (0, 255, 255)
+    texts = "PENDING"
     try:
         while True:
             frame_count += 1
@@ -78,44 +71,40 @@ def live_inference(yolo_model,
             if frame_count % detect_interval == 0:
 
                 if detect:
-                    # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     frame = cv2.resize(frame, imgsz)
-                    frame, boxes = run_yolo(yolo_model,
-                                            frame,
-                                            device=device,
-                                            half=half,
-                                            view_img=False,
-                                            **kwargs
-                                            )
+                    run_yolo(yolo_model,
+                             frame,
+                             device=device,
+                             half=half,
+                             **kwargs
+                             )
                     if fall:
-                        """
-                        TODO
-                        Object tracking and Multi Object Fall detection
-                        """
-                        if boxes:
-                            box_que.append(DEFAULT_TRANSFORMS(Image.fromarray(boxes[0])))
-                            if len(box_que) == 10:
-                                flag = run_cnn3d(box_que, cnn3d, device, class_names, duration=duration)
+                        globalF = False
+                        for track in tracks.tracks:
+                            if track.current:
+                                track.current = False
+                                flag = track.__inference__(cnn3d, duration=duration)
+                                globalF |= flag
                                 if flag:
+                                    # If fall, then draw red rectangle
                                     texts = f"FALL!!!"
-                                    color = (255, 0, 0)
+                                    color = (0, 0, 255)
+                                    track.__draw__(frame, color=color)
                                 else:
+                                    # If walk, then draw green rectangle
                                     texts = f"WALK"
                                     color = (0, 255, 0)
-                            else:
-                                texts = f"PENDING"
-                                color = (255, 255, 0)
-                        else:
-                            if not FLAG:
-                                texts = f"NO PEOPLE DETECTED"
-                                color = (255, 255, 0)
+                                    track.__draw__(frame)
+                        if globalF:
+                            texts = f"FALL!!!"
+                            color = (0, 0, 255)
+                        if not tracks.tracks:
+                            texts = f"NO PEOPLE DETECTED"
+                            color = (0, 255, 255)
             cv2.putText(frame, texts, (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75,
                         color, 2)
             IPython.display.clear_output(wait=True)  # clear the previous frame
             show_array(frame)
-            if boxes:
-                show_array(boxes[0])
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.resize(frame, size)
             out.write(frame)
         v_cap.release()
@@ -149,14 +138,10 @@ def run_yolo(model,  # model.pt path(s)
              conf_thres=0.25,  # confidence threshold
              iou_thres=0.45,  # NMS IOU threshold
              max_det=1000,  # maximum detections per image
-             view_img=False,  # show results
              classes=None,  # filter by class: --class 0, or --class 0 2 3
              agnostic_nms=False,  # class-agnostic NMS
              augment=False,  # augmented inference
              visualize=False,  # visualize features
-             line_thickness=3,  # bounding box thickness (pixels)
-             hide_labels=False,  # hide labels
-             hide_conf=False,  # hide confidences
              half=False,  # use FP16 half-precision inference
              ):
     # Load model
@@ -181,23 +166,14 @@ def run_yolo(model,  # model.pt path(s)
     # Process predictions
     for i, det in enumerate(pred):  # per image
         im0 = img.copy()
-        annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+        bbox_xyxy = []
+        confs = []
         if len(det):
             # Rescale boxes from img_size to im0 size
             det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
             # Write results
             for *xyxy, conf, cls in reversed(det):
-                box = save_one_box(xyxy, img, save=False, BGR=False)
-                boxes.append(box)
-                c = int(cls)  # integer class
-                label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                annotator.box_label(xyxy, label, color=colors(c, True))
-        # Stream results
-        im0 = annotator.result()
-        im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
-        if view_img:
-            IPython.display.clear_output(wait=True)  # clear the previous frame
-            show_array(im0)
-            show_array(box)
-
-    return im0, boxes
+                bbox_xyxy.append(xyxy)
+                confs.append(conf)
+        tracks.update(torch.tensor(bbox_xyxy), confs, im0)
+    return

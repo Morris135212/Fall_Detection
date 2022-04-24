@@ -10,6 +10,7 @@ from PIL import Image
 import torchvision.transforms as T
 
 from models.common import DetectMultiBackend
+from tracking import Tracks
 from utils.inference_utils import show_array
 
 FILE = Path(__file__).resolve()
@@ -21,9 +22,8 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 from dataset.yolo.datasets import LoadImages
 from utils.general import (check_img_size, increment_path, non_max_suppression, scale_coords, bbox_rel)
 from utils.plots import Annotator, colors, save_one_box, compute_color_for_labels, draw_boxes
-from deep_sort import DeepSort
 
-deepsort = DeepSort("deep_sort/deep/checkpoint/ckpt.t7")
+tracks = Tracks(min_conf=0.5)
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 HISTORY = []
 DATA_SHAPE = (416, 416)
@@ -344,7 +344,6 @@ def live_inference_fed_img(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                                                      half=half,
                                                      **kwargs
                                                      )
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.resize(frame, size)
             out.write(frame)
             frame_count += 1
@@ -434,7 +433,6 @@ def run_per_img(model,  # model.pt path(s)
                 f.close()
         # Stream results
         im0 = annotator.result()
-        im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
         if view_img or save_img:
             if save_img:
                 save_path = save_dir / "detected.png"
@@ -465,10 +463,8 @@ def run_per_img_tracking(model,  # model.pt path(s)
                          project=ROOT / 'runs/detect',  # save results to project/name
                          name='exp',  # save results to project/name
                          exist_ok=True,  # existing project/name ok, do not increment
-                         line_thickness=3,  # bounding box thickness (pixels)
-                         hide_labels=False,  # hide labels
-                         hide_conf=False,  # hide confidences
                          half=False,  # use FP16 half-precision inference
+                         **kwargs
                          ):
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
@@ -496,28 +492,22 @@ def run_per_img_tracking(model,  # model.pt path(s)
     # Process predictions
     for i, det in enumerate(pred):  # per image
         im0 = img.copy()
-        imc = im0.copy() if save_crop else im0  # for save_crop
         if len(det):
             # Rescale boxes from img_size to im0 size
             det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
-            bbox_xywh = []
+            bbox_xyxy = []
             confs = []
 
             # Write results
             for *xyxy, conf, cls in reversed(det):
-                x_c, y_c, bbox_w, bbox_h = bbox_rel(xyxy)
-                obj = [x_c, y_c, bbox_w, bbox_h]
-                bbox_xywh.append(obj)
-                confs.append([conf.item()])
+                bbox_xyxy.append(xyxy)
+                confs.append(conf)
+            tracks.update(torch.tensor(bbox_xyxy), confs, im0)
 
-            outputs = deepsort.update((torch.Tensor(bbox_xywh)), (torch.Tensor(confs)), im0)
-            if len(outputs) > 0:
-                bbox_xyxy = outputs[:, :4]
-                identities = outputs[:, -1]
-                draw_boxes(im0, bbox_xyxy, identities)
-
+            for track in tracks.tracks:
+                if track.current:
+                    track.__draw__(im0)
         # Stream results
-        im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
         if view_img or save_img:
             if save_img:
                 save_path = save_dir / "detected.png"
