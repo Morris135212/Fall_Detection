@@ -5,9 +5,11 @@ However, those devices are generally unable to detect some motion characteristic
 </p>
 
 Demo of the application
+
 ![](data/resources/demo2.gif)
 
 Fall action happens when objects are partially obscured
+
 ![](data/resources/demo.gif)
 
 
