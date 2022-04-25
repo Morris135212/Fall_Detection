@@ -69,7 +69,6 @@ def live_inference(yolo_model,
                 print("Detect Finished")
                 break
             if frame_count % detect_interval == 0:
-
                 if detect:
                     frame = cv2.resize(frame, imgsz)
                     run_yolo(yolo_model,

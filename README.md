@@ -4,9 +4,21 @@ Nowadays, people are easily to obtain their physical characteristics by smart de
 However, those devices are generally unable to detect some motion characteristics like Falling. Falling is extremely dangerous when someone live alone. So this brought me the inspiration to construct this framework to detect Fall action in home.
 </p>
 
-![](data/demo.gif)
+![](data/resources/demo.gif)
 
 ## <div align="center">Pipeline</div>
+### Step 1. Detections
+The first step is to implement the detection on each frame, so at the end of this stage we can generate detection for each frame in video stream.
+![](data/resources/detection.png)
+
+#### Step 2. Tracking
+Reference on [DeepSort algorithm](https://github.com/nwojke/deep_sort)
+However, Jetson nano 2GB can't 
+![](data/resources/Tracking.png)
+![](data/resources/Tracking_UML.png)
+
+#### Step 3. Fall Detection
+![](data/resources/Fall_detect.png)
 
 ## <div align="center">Quick Start</div>
 
