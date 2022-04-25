@@ -16,8 +16,8 @@ The first step is to implement the detection on each frame, so at the end of thi
 #### Step 2. Tracking
 Referring on [DeepSort algorithm](https://github.com/nwojke/deep_sort) I decide to adopt the framework of yolov5 + deepsort to accomplish multi-object tracking.
 However, the fact is that Jetson Nano 2GB doesn't have enough computing resources to support yolov5+DeepSort inferring in real time. Moreover, considering in our scenario, there will be only limited people appear in the detecting area, so it is not necessary to adopt a complicated tracking system.
-Therefore, I simplify the framework of Deepsort, Here we didn't use deep network to predict the bounding box in frame t+1, rather I use the bounding box detected by Yolov5 at t+1 to match with the bounding box with t. Therefore, kalman filter module is not necessary in current tracking framework.
-This slight change could greatly improve the whole throughput of this application.
+Therefore, I simplify the framework of Deepsort, Here we didn't use deep network to predict the bounding box in frame t+1, rather I use the bounding box detected by Yolov5 at t+1 to match with the tracks at t. Therefore, kalman filter module is not necessary in current tracking framework.
+These slight changes could greatly improve the whole throughput of this application.
 
 detail of this pipeline can be seen in the following figure
 

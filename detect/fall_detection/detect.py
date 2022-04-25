@@ -16,6 +16,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 from utils.general import (increment_path, non_max_suppression, scale_coords, check_img_size)
 from tracking import Tracks
 
+# Initialize the tracks
 tracks = Tracks(min_conf=0.5)
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 HISTORY = []
@@ -103,6 +104,8 @@ def live_inference(yolo_model,
             cv2.putText(frame, texts, (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75,
                         color, 2)
             IPython.display.clear_output(wait=True)  # clear the previous frame
+            # if tracks.tracks:
+            #     print(tracks.tracks[0].fall_history)
             show_array(frame)
             frame = cv2.resize(frame, size)
             out.write(frame)
@@ -159,7 +162,6 @@ def run_yolo(model,  # model.pt path(s)
 
     # Inference
     pred = model(im, augment=augment, visualize=visualize)
-    boxes = []
     # NMS
     pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
     # Process predictions
