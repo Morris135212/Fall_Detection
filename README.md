@@ -4,12 +4,12 @@ Nowadays, people are easily to obtain their physical characteristics by smart de
 However, those devices are generally unable to detect some motion characteristics like Falling. Falling is extremely dangerous when someone live alone. So this brought me the inspiration to construct this framework to detect Fall action in home.
 </p>
 
-![](data/resources/demo.gif)
+![](data/resources/demo.gif#pic_center)
 
 ## <div align="center">Pipeline</div>
 ### Step 1. Detections
 The first step is to implement the detection on each frame, so at the end of this stage we can generate detection for each frame in video stream.
-![](data/resources/detection.png)
+![](data/resources/detection.png#pic_center)
 
 #### Step 2. Tracking
 Reference on [DeepSort algorithm](https://github.com/nwojke/deep_sort) I decide to adopt the framework of yolov5 + deepsort to accomplish multi-object tracking.
@@ -18,17 +18,17 @@ So here I simplify the framework of Deepsort, Here we didn't use deep network to
 
 detail of this pipeline can be seen in the following figure
 
-![](data/resources/Tracking.png)
+![](data/resources/Tracking.png#pic_center)
 
 While building this tracking framework, two most important class: **Tracks** and **Track** are vital to the implementation. The UML with respect to those two class are shown in the following figure
-![](data/resources/Tracking_UML.png)
+![](data/resources/Tracking_UML.png#pic_center)
 
 #### Step 3. Fall Detection
 The final step is to detect fall action. This part is accomplished by 3DCNN, benefit from the characteristics of spatiotemporal, the model is capable of identifying actions in a period of time. 
 
 For each track in the track pool, we take the crop from it and transform it into form where it is able to be fed into 3dCNN model. 
 And finally we have our output for current track.
-![](data/resources/Fall_detect.png)
+![](data/resources/Fall_detect.png#pic_center)
 
 ## <div align="center">Quick Start</div>
 
