@@ -509,12 +509,10 @@ def run_per_img_tracking(model,  # model.pt path(s)
                     track.__draw__(im0)
         # Stream results
         if view_img or save_img:
-            if save_img:
-                save_path = save_dir / "detected.png"
-                frame = Image.fromarray(im0)
-                frame.save(save_path)
             if view_img:
                 IPython.display.clear_output(wait=True)  # clear the previous frame
                 show_array(im0)
-
+            if save_img:
+                save_path = save_dir / "detected.png"
+                cv2.imwrite(str(save_path), im0)
     return im0

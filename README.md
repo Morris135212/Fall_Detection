@@ -4,12 +4,14 @@ Nowadays, people are easily to obtain their physical characteristics by smart de
 However, those devices are generally unable to detect some motion characteristics like Falling. Falling is extremely dangerous when someone live alone. So this brought me the inspiration to construct this framework to detect Fall action in home.
 </p>
 
-![](data/resources/demo.gif#pic_center)
+![](data/resources/demo.gif)
+
+![](data/resources/demo2.gif)
 
 ## <div align="center">Pipeline</div>
 ### Step 1. Detections
 The first step is to implement the detection on each frame, so at the end of this stage we can generate detection for each frame in video stream.
-![](data/resources/detection.png#pic_center)
+![](data/resources/detection.png)
 
 #### Step 2. Tracking
 Referring on [DeepSort algorithm](https://github.com/nwojke/deep_sort) I decide to adopt the framework of yolov5 + deepsort to accomplish multi-object tracking.
