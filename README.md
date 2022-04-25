@@ -12,23 +12,24 @@ The first step is to implement the detection on each frame, so at the end of thi
 ![](data/resources/detection.png#pic_center)
 
 #### Step 2. Tracking
-Reference on [DeepSort algorithm](https://github.com/nwojke/deep_sort) I decide to adopt the framework of yolov5 + deepsort to accomplish multi-object tracking.
-However, the fact is that Jetson Nano 2GB doesn't have enough computing resources to support yolov5+DeepSort inferring in real time. Moreover, considering in our scenario, there will be only limited people appear in the detecting area, so it is not necessary to adopt a complicated tracking system
-So here I simplify the framework of Deepsort, Here we didn't use deep network to predict the bounding box in frame t+1 and match the Tracks t+1 with detections t+1. On the contrary, I use the detection in t to match with the detection in t+1. Therefore, kalman filter module is not necessary in current tracking framework.
+Referring on [DeepSort algorithm](https://github.com/nwojke/deep_sort) I decide to adopt the framework of yolov5 + deepsort to accomplish multi-object tracking.
+However, the fact is that Jetson Nano 2GB doesn't have enough computing resources to support yolov5+DeepSort inferring in real time. Moreover, considering in our scenario, there will be only limited people appear in the detecting area, so it is not necessary to adopt a complicated tracking system.
+Therefore, I simplify the framework of Deepsort, Here we didn't use deep network to predict the bounding box in frame t+1, rather I use the bounding box detected by Yolov5 at t+1 to match with the bounding box with t. Therefore, kalman filter module is not necessary in current tracking framework.
+This slight change could greatly improve the whole throughput of this application.
 
 detail of this pipeline can be seen in the following figure
 
-![](data/resources/Tracking.png#pic_center)
+![](data/resources/Tracking.png)
 
-While building this tracking framework, two most important class: **Tracks** and **Track** are vital to the implementation. The UML with respect to those two class are shown in the following figure
-![](data/resources/Tracking_UML.png#pic_center)
+While building this tracking framework, there are two most important class: **Tracks** and **Track**. The UML with respect to those two class are shown in the following figure
+![](data/resources/Tracking_UML.png)
 
 #### Step 3. Fall Detection
 The final step is to detect fall action. This part is accomplished by 3DCNN, benefit from the characteristics of spatiotemporal, the model is capable of identifying actions in a period of time. 
 
-For each track in the track pool, we take the crop from it and transform it into form where it is able to be fed into 3dCNN model. 
+For each track in the track pool, we take the crop from it and transform it and fed it into 3DCNN model. 
 And finally we have our output for current track.
-![](data/resources/Fall_detect.png#pic_center)
+![](data/resources/Fall_detect.png)
 
 ## <div align="center">Quick Start</div>
 
@@ -134,8 +135,7 @@ trainer()
 <details open>
 <summary>Fall Detection Inference</summary>
 
-The script below shows how to do Fall detection inference
-
+The script below shows how to do Fall detection inference.
 ```python
 from models.common import DetectMultiBackend
 import torch
@@ -157,7 +157,6 @@ source = 0 # Live inference
 live_inference(yolo_model=yolo_model,
                cnn3d=cnn3d, 
                source=source,
-               class_names=["WALK", "FALL"],
                out_name="FALL_DETECTION", #Out put file name
                fall=True, # Whether to perform Fall detection
                conf_thres=0.4)
