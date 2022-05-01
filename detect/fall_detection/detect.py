@@ -1,4 +1,5 @@
 import os
+import time
 import sys
 from pathlib import Path
 import IPython
@@ -66,6 +67,7 @@ def live_inference(yolo_model,
         while True:
             frame_count += 1
             success, frame = v_cap.read()  # read frame from video
+            start_time = time.time()
             if not success:
                 print("Detect Finished")
                 break
@@ -101,8 +103,12 @@ def live_inference(yolo_model,
                         if not tracks.tracks:
                             texts = f"NO PEOPLE DETECTED"
                             color = (0, 255, 255)
+            end_time = time.time()
+            fps = 1 / (end_time-start_time)
             cv2.putText(frame, texts, (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75,
                         color, 2)
+            cv2.putText(frame, f"{fps:.2f}fps", (310, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75,
+                        (0, 0, 255), 2)
             IPython.display.clear_output(wait=True)  # clear the previous frame
             # if tracks.tracks:
             #     print(tracks.tracks[0].fall_history)
