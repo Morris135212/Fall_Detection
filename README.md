@@ -142,7 +142,7 @@ trainer()
 <details open>
 <summary>Download weights</summary>
 Access this
-<a href="[links](https://drive.google.com/drive/folders/1qzUyb2u28ea7j0RRVTqr4X26waIc3Vxl?usp=sharing)">link</a>
+<a href="https://drive.google.com/drive/folders/1qzUyb2u28ea7j0RRVTqr4X26waIc3Vxl?usp=sharing">link</a>
 to download yolov5n weights and 3dcnn weights
 
 put the weights under ./data/weights directory
