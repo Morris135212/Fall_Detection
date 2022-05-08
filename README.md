@@ -6,12 +6,19 @@ However, those devices are generally unable to detect some motion characteristic
 
 Demo of the application
 
+When No fall action happens
+![](data/resources/demo3.gif)
+
+When fall action happen in detecting area.
 ![](data/resources/demo2.gif)
 
 Fall action happens when objects are partially obscured
 
 ![](data/resources/demo.gif)
 
+Fall action happens when multi-objects are in the detecting area
+
+![](data/resources/demo6.gif)
 
 ## <div align="center">Pipeline</div>
 ### Step 1. Detections

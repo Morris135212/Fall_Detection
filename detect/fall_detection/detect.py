@@ -38,6 +38,7 @@ def live_inference(yolo_model,
                    name='exp',  # save results to project/name
                    exist_ok=True,  # existing project/name ok, do not increment
                    half=False,  # use FP16 half-precision inference
+                   target_idx=1,
                    **kwargs
                    ):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -85,7 +86,7 @@ def live_inference(yolo_model,
                         for track in tracks.tracks:
                             if track.current:
                                 track.current = False
-                                flag = track.__inference__(cnn3d, duration=duration)
+                                flag = track.__inference__(cnn3d, duration=duration, target_idx=target_idx)
                                 globalF |= flag
                                 if flag:
                                     # If fall, then draw red rectangle
@@ -97,6 +98,11 @@ def live_inference(yolo_model,
                                     texts = f"WALK"
                                     color = (0, 255, 0)
                                     track.__draw__(frame)
+                            else:
+                                if track.fall_history:
+                                    flag = track.fall_history[-1]
+                                    if flag == target_idx:
+                                        globalF = True
                         if globalF:
                             texts = f"FALL!!!"
                             color = (0, 0, 255)

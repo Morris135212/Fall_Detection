@@ -40,8 +40,9 @@ class Track:
         """
         self.bbox = bbox
         self.conf = conf
-        crops = save_one_box(bbox, img, save=False, BGR=False) # Crops current object from the img
-        self.box_history.append(DEFAULT_TRANSFORMS(Image.fromarray(crops))) # Transform it into form where can be fed into 3dcnn
+        crops = save_one_box(bbox, img, save=False, BGR=False)  # Crops current object from the img
+        # Transform it into form where can be fed into 3dcnn
+        self.box_history.append(DEFAULT_TRANSFORMS(Image.fromarray(crops)))
 
     def __draw__(self, img, offset=(0, 0), color=None):
         """
@@ -97,6 +98,7 @@ class Tracks:
     This class include the information of all track at real time at the video stream
     This class also respond for matching current detection with previous tracks
     """
+
     def __init__(self, min_iou=0.5, min_conf=0.3, max_age=30):
         """
         :param min_iou:float minimum iou, if two boxes have iou > min_iou will be viewed as connected,
@@ -107,8 +109,8 @@ class Tracks:
         self.min_iou = min_iou
         self.min_conf = min_conf
         self.max_age = max_age
-        self.latest_id = 0    # A new track will be assigned with this latest_id
-        self.tracks = []      # all tracks are included in this list
+        self.latest_id = 0  # A new track will be assigned with this latest_id
+        self.tracks = []  # all tracks are included in this list
         self.detections = []  # detection at current moment will be included in this list
 
     def update(self, bboxes_xyxy, confidences, img):
@@ -138,7 +140,7 @@ class Tracks:
                 self.tracks.append(Track(self.latest_id, box, conf, img))
                 self.latest_id += i
         else:
-            self.detections = []   # initialize current detection
+            self.detections = []  # initialize current detection
             for i, (box, conf) in enumerate(zip(bboxes_xyxy, confidences)):
                 self.detections.append(Detection(box, conf))  # Append necessary information to detection
 
